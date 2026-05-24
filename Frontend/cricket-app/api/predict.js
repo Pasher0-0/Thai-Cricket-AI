@@ -1,44 +1,43 @@
 // Vercel serverless proxy: forwards POST /api/predict to HF Space
-// Place this file in Frontend/cricket-app/api/predict.js
+// Uses CommonJS for better compatibility with Vercel Node.js runtime
 const HF_PREDICT_URL = 'https://pasher0-0-cricket-api.hf.space/predict';
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
+  // Only handle POST requests
   if (req.method !== 'POST') {
-    res.status(405).send('Method Not Allowed');
-    return;
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    // Read raw body from the incoming request
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const bodyBuffer = Buffer.concat(chunks);
-
-    // Clone headers but remove host (and content-length will be recalculated by fetch)
-    const outgoingHeaders = { ...req.headers };
-    delete outgoingHeaders.host;
-    delete outgoingHeaders['content-length'];
-
-    // Forward the request to the HF Space endpoint
-    const forwarded = await fetch(HF_PREDICT_URL, {
+    // Forward the entire request (headers + body) to HF Space
+    const response = await fetch(HF_PREDICT_URL, {
       method: 'POST',
-      headers: outgoingHeaders,
-      body: bodyBuffer,
-      // keep redirect behavior default
+      headers: {
+        // Copy relevant headers from incoming request, skip hop-by-hop headers
+        'content-type': req.headers['content-type'] || 'application/octet-stream',
+      },
+      body: req, // req stream contains the multipart body
     });
 
-    // Stream response headers and body back to the client
-    res.status(forwarded.status);
-    forwarded.headers.forEach((value, key) => {
-      // Avoid setting hop-by-hop headers
-      if (['transfer-encoding', 'connection', 'keep-alive'].includes(key)) return;
-      res.setHeader(key, value);
-    });
+    // Copy response status and headers back to client
+    res.status(response.status);
+    
+    // Forward response headers (skip hop-by-hop headers)
+    const headersToSkip = ['transfer-encoding', 'connection', 'keep-alive', 'content-encoding'];
+    for (const [key, value] of response.headers.entries()) {
+      if (!headersToSkip.includes(key.toLowerCase())) {
+        res.setHeader(key, value);
+      }
+    }
 
-    const respBuffer = await forwarded.arrayBuffer();
-    res.send(Buffer.from(respBuffer));
+    // Stream response body back
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
   } catch (err) {
     console.error('Proxy error:', err);
-    res.status(500).json({ error: 'Proxy error', detail: String(err) });
+    res.status(502).json({ 
+      error: 'Bad Gateway - Failed to proxy request to HF Space',
+      detail: process.env.NODE_ENV === 'development' ? String(err) : undefined
+    });
   }
-}
+};
