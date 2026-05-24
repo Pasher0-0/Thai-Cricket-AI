@@ -6,15 +6,14 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class CricketApiService {
-  // เรียกใช้ HttpClient ผ่านฟังก์ชัน inject() แบบฉบับ Angular 17
   private http = inject(HttpClient);
   
-  // URL ของเซิร์ฟเวอร์ Python ที่เราเปิดทิ้งไว้
-  private apiUrl = '/api/predict';
-  // ฟังก์ชันรับไฟล์เสียงแล้วยิงไปหาเซิร์ฟเวอร์
- predictAudio(file: File): Observable<any> {
-  const formData = new FormData();
-  formData.append('file', file);
-  return this.http.post<any>('/api/predict', formData);
-}
+  // Call HF Space backend directly (CORS configured to allow Vercel domain)
+  private hfSpaceUrl = 'https://pasher0-0-cricket-api.hf.space/predict';
+  
+  predictAudio(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<any>(this.hfSpaceUrl, formData);
+  }
 }

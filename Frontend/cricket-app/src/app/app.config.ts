@@ -4,8 +4,7 @@ import { routes } from './app.routes';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 
 // 1. นำเข้าเครื่องมือสำหรับจัดการ HTTP Request
-import { provideHttpClient, withFetch, HTTP_INTERCEPTORS } from '@angular/common/http'; 
-import { ApiProxyInterceptor } from './services/api-proxy.interceptor';
+import { provideHttpClient, withFetch } from '@angular/common/http'; 
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -15,12 +14,5 @@ export const appConfig: ApplicationConfig = {
     
     // 2. เพิ่มคำสั่งนี้ลงไปใน Array เพื่อให้แอปยิง API ได้
     provideHttpClient(withFetch()),
-    
-    // 3. เพิ่ม HTTP Interceptor สำหรับ proxy /api/* requests ไปหา HF Space
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: ApiProxyInterceptor,
-      multi: true
-    }
   ]
 };
