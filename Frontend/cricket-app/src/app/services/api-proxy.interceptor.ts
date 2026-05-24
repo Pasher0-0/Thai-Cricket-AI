@@ -17,15 +17,19 @@ export class ApiProxyInterceptor implements HttpInterceptor {
     request: HttpRequest<unknown>,
     next: HttpHandler
   ): Observable<HttpEvent<unknown>> {
-    // If request starts with /api/, rewrite to HF Space URL
-    if (request.url.startsWith('/api/')) {
-      const path = request.url.replace(/^\/api\//, '');
+    // Match /api/* in both relative and absolute URLs
+    const apiMatch = request.url.match(/\/api\/(.*)/);
+    
+    if (apiMatch) {
+      const path = apiMatch[1];
       const newUrl = `${this.hfSpaceUrl}/${path}`;
       
       // Clone request with new URL, preserving method, body, headers
       const newRequest = request.clone({
         url: newUrl,
       });
+      
+      console.log('Intercepting API request:', request.url, '→', newUrl);
       
       return next.handle(newRequest).pipe(
         catchError((error: HttpErrorResponse) => {
