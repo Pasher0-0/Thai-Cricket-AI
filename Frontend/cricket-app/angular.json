@@ -37,8 +37,7 @@
             "security": {
               "allowedHosts": []
             },
-            "prerender": false,
-            "ssr": null
+            "prerender": false
           },
           "configurations": {
             "production": {
