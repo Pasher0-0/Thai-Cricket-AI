@@ -1,5 +1,5 @@
-import { Component, inject, AfterViewInit, OnInit, NgZone } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, AfterViewInit, OnInit, NgZone, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { CricketApiService } from '../../services/cricket-api.service';
 
 interface RecordingHistoryItem {
@@ -23,6 +23,7 @@ interface RecordingHistoryItem {
 export class CricketPredictorComponent implements OnInit {
   private cricketApi = inject(CricketApiService);
   private ngZone = inject(NgZone);
+  private platformId = inject(PLATFORM_ID);
   private mediaStream: MediaStream | null = null;
 
   selectedFile: File | null = null;
@@ -98,6 +99,9 @@ export class CricketPredictorComponent implements OnInit {
   }
 
   private persistHistory() {
+    // Only save to localStorage in browser environment
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     try {
       const historyToSave = this.recordingHistory.map(item => ({
         ...item,
@@ -109,6 +113,12 @@ export class CricketPredictorComponent implements OnInit {
   }
 
   private loadRecordingHistory() {
+    // Only load from localStorage in browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      this.recordingHistory = [];
+      return;
+    }
+    
     try {
       const stored = localStorage.getItem('cricketRecordingHistory');
       if (stored) {
