@@ -1,0 +1,640 @@
+<div class="container mt-5 mb-1" style="max-width: 900px; ">
+  <!-- Header Card -->
+  <div class="card shadow-sm border-0 rounded-4 p-4 mb-4">
+    <div class="card-body">
+      <h3 class="card-title text-center mb-1">🦗 Cricket AI Predictor</h3>
+      <p class="text-center text-muted mb-4">ระบบจำแนกสายพันธุ์จิ้งหรีดด้วยเสียง</p>
+
+      <div class="upload-area border rounded p-4 text-center bg-light mb-3">
+        <div class="tabs-container mb-3">
+          <div class="btn-group w-100" role="group">
+            <button 
+              type="button" 
+              class="btn fw-bold"
+              [ngClass]="inputMode === 'upload' ? 'btn-primary' : 'btn-outline-primary'"
+              (click)="switchInputMode('upload')">
+              📁 อัปโหลดไฟล์
+            </button>
+            
+            <button 
+              type="button" 
+              class="btn fw-bold"
+              [ngClass]="inputMode === 'record' ? 'btn-primary' : 'btn-outline-primary'"
+              (click)="switchInputMode('record')">
+              🎤 บันทึกเสียง
+            </button>
+          </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div *ngIf="inputMode === 'upload'">
+          <input 
+            type="file" 
+            class="form-control mb-3" 
+            accept="audio/*, video/mp4"
+            (change)="onFileSelected($event)">
+        </div>
+
+        <!-- Recording Section -->
+        <div *ngIf="inputMode === 'record'">
+          <div *ngIf="!recordedBlob" class="record-controls mb-3">
+            <div class="record-timer mb-3" *ngIf="isRecording" style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">
+              ⏱️ {{ recordingDuration }} วินาที
+            </div>
+            
+            <button 
+              class="btn fw-bold w-100 mb-2"
+              [ngClass]="isRecording ? 'btn-danger' : 'btn-success'"
+              [disabled]="isLoading"
+              (click)="isRecording ? stopRecording() : startRecording()">
+              <span *ngIf="!isRecording"><i class="bi bi-record-circle-fill"></i> เริ่มบันทึก</span>
+              <span *ngIf="isRecording"><i class="bi bi-stop-circle-fill"></i> หยุดบันทึก</span>
+            </button>
+          </div>
+
+          <!-- Playback Section -->
+          <div *ngIf="recordedBlob" class="recorded-controls">
+            <div class="alert alert-success mb-3">
+              ✅ บันทึกเสียงสำเร็จ ({{ recordingDuration }} วินาที)
+            </div>
+            
+            <div class="btn-group w-100 mb-3" role="group">
+              <button 
+                type="button" 
+                class="btn btn-info fw-bold"
+                [disabled]="isLoading"
+                (click)="playRecording()">
+                <i class="bi bi-play-fill"></i> เล่นเสียง
+              </button>
+              <button 
+                type="button" 
+                class="btn btn-warning fw-bold"
+                [disabled]="isLoading"
+                (click)="clearRecording()">
+                <i class="bi bi-recycle"></i> บันทึกใหม่
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button 
+          class="btn btn-primary w-100 fw-bold" 
+          [disabled]="!selectedFile || isLoading"
+          (click)="analyzeAudio()">
+          <span *ngIf="!isLoading">วิเคราะห์เสียงทายสายพันธุ์</span>
+          <span *ngIf="isLoading">กำลังส่งข้อมูลให้ AI...</span>
+        </button>
+        <small style="display:block ; margin-top: 5px;color: red;">หมายเหตุ: ยิ่งเสียงที่บันทึกมายาวเท่าไหร่ ความแม่นยำยิ่งสูงขึ้น แนะนำ 12 วินาทีขึ้นไปเพื่อความแม่นยำ</small>
+      </div>
+
+      <div class="progress mb-3" style="height: 10px;" *ngIf="isLoading">
+        <div 
+          class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+          role="progressbar" 
+          [style.width.%]="progressValue">
+        </div>
+      </div>
+
+      <div class="alert alert-danger" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Recording History Button -->
+      <div class="mt-4 pt-3 border-top" *ngIf="recordingHistory.length > 0">
+        <button 
+          class="btn btn-outline-secondary fw-bold w-100"
+          (click)="showHistory = !showHistory">
+          <i class="bi bi-clock-history"></i> 
+          {{ showHistory ? 'ซ่อนประวัติการบันทึก' : 'ดูประวัติการบันทึก' }} 
+          ({{ recordingHistory.length }})
+        </button>
+      </div>
+
+      <!-- Recording History Panel -->
+      <div class="mt-3" *ngIf="showHistory && recordingHistory.length > 0">
+        <div class="card border-secondary">
+          <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">📚 ประวัติการบันทึก</h6>
+            <button 
+              class="btn btn-sm btn-outline-danger"
+              (click)="clearAllHistory()"
+              title="Delete all recordings">
+              🗑️ ลบทั้งหมด
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              <div *ngFor="let item of recordingHistory" class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="flex-grow-1">
+                    <div class="fw-bold text-primary">
+                      {{ item.species ? '✅ ' : '⚠️ ' }}
+                      {{ item.species || 'ไม่ระบุชนิด' }}
+                    </div>
+                    <small class="text-muted">
+                      {{ formatDate(item.timestamp) }} 
+                      ({{ item.duration }}s)
+                    </small>
+                    <div *ngIf="item.confidence" class="small mt-1">
+                      ความมั่นใจ: <strong>{{ item.confidence | number:'1.1-1' }}%</strong>
+                    </div>
+                  </div>
+                  <div class="btn-group btn-group-sm ms-2" role="group">
+                    <button 
+                      class="btn btn-outline-primary"
+                      (click)="loadFromHistory(item)"
+                      title="Load and analyze again">
+                      📂 เลือก
+                    </button>
+                    <button 
+                      class="btn btn-outline-success"
+                      (click)="downloadFromHistory(item)"
+                      title="Download audio file">
+                      💾 ดาวน์โหลด
+                    </button>
+                    <button 
+                      class="btn btn-outline-danger"
+                      (click)="deleteFromHistory(item.id)"
+                      title="Delete recording">
+                      🗑️ ลบ
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Section -->
+  <div *ngIf="resultData && resultData.status === 'success'">
+    <!-- Invalid Cricket Alert -->
+    <div class="alert alert-warning border-2 border-warning mb-4" *ngIf="!resultData.is_valid_cricket">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.5rem; margin-right: 15px; color: #ff6b6b;"></i>
+        <div>
+          <h5 class="alert-heading mb-2">⚠️ ไม่ใช่เสียงจิ้งหรีด</h5>
+          <p class="mb-0">{{ resultData.message }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Result Card -->
+    <div class="card shadow-lg border-0 rounded-4 p-4 mb-4" [ngClass]="resultData.is_valid_cricket ? 'bg-gradient' : 'bg-danger-light'">
+      <div class="card-body">
+        <h5 class="text-muted mb-3"><i class="bi bi-pin-fill"></i> ผลการวิเคราะห์หลัก</h5>
+        <h2 class="fw-bold" [ngClass]="resultData.is_valid_cricket ? 'text-primary' : 'text-danger'">{{ resultData.species }}</h2>
+        
+        <div [ngClass]="resultData.is_valid_cricket ? 'confidence-display' : 'confidence-display-invalid'">
+          <div class="d-flex align-items-center mb-2">
+            <span class="text-muted me-2">ระดับความมั่นใจ:</span>
+            <span [ngClass]="resultData.is_valid_cricket ? 'badge bg-success fs-5 px-3 py-2' : 'badge bg-danger fs-5 px-3 py-2'">
+              {{ resultData.confidence }}
+            </span>
+          </div>
+          
+          <!-- Confidence Percentage Bar -->
+          <div class="progress mt-3" style="height: 25px; background-color: #e9ecef;">
+            <div 
+              class="progress-bar fw-bold" 
+              [ngClass]="resultData.is_valid_cricket ? 'bg-success' : 'bg-danger'"
+              role="progressbar" 
+              [style.width.%]="resultData.confidence_decimal * 100">
+              {{ resultData.confidence }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Breed Details Card -->
+    <div class="card shadow-lg border-0 rounded-4 p-4 mb-4 bg-light" *ngIf="resultData.breed_details && resultData.is_valid_cricket">
+      <div class="card-body">
+        <div class="row align-items-start">
+          <div class="col-md-3 text-center">
+            <div class="breed-icon mb-3">
+              <img *ngIf="getBreedImage()" [src]="getBreedImage()" alt="Cricket Image" style="width:100px; height:100px; object-fit:cover; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,0.12); background:#fff;">
+              <i *ngIf="!getBreedImage()" class="bi bi-bug" style="font-size: 4rem; color: #667eea;"></i>
+            </div>
+            <h6 class="fw-bold text-dark">{{ resultData.breed_details.thai_name }}</h6>
+            <small class="text-muted">{{ resultData.breed_details.common_name }}</small>
+          </div>
+          
+          <div class="col-md-9">
+            <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle"></i> ข้อมูลสายพันธุ์</h5>
+            
+            <p class="text-justify mb-3">
+              <strong>รายละเอียด:</strong> {{ resultData.breed_details.description }}
+            </p>
+            
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="detail-item">
+                  <label class="detail-label"><i class="bi bi-rulers"></i> ขนาด</label>
+                  <p class="detail-value">{{ resultData.breed_details.size }}</p>
+                </div>
+                <div class="detail-item">
+                  <label class="detail-label"><i class="bi bi-soundwave"></i> ช่วงความถี่</label>
+                  <p class="detail-value">{{ resultData.breed_details.frequency_range }}</p>
+                </div>
+                <div class="detail-item">
+                  <label class="detail-label"><i class="bi bi-palette"></i> สีลักษณ์</label>
+                  <p class="detail-value">{{ resultData.breed_details.color }}</p>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="detail-item">
+                  <label class="detail-label"><i class="bi bi-tree"></i> ที่อยู่อาศัย</label>
+                  <p class="detail-value">{{ resultData.breed_details.habitat }}</p>
+                </div>
+                <div class="detail-item">
+                  <label class="detail-label"><i class="bi bi-activity"></i> พฤติกรรม</label>
+                  <p class="detail-value">{{ resultData.breed_details.behavior }}</p>
+                </div>
+                <div class="detail-item">
+                  <label class="detail-label"><i class="bi bi-map"></i> การกระจาย</label>
+                  <p class="detail-value">{{ resultData.breed_details.distribution }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audio Characteristics Card -->
+    <div class="card shadow-sm border-0 rounded-4 p-4 mb-4 border-start border-4 border-info">
+      <div class="card-body">
+        <h5 class="card-title mb-4"><i class="bi bi-info-circle-fill"></i> ลักษณะทางกายภาพของเสียง</h5>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <div class="characteristic-item mb-3">
+              <label class="text-muted small">ระยะเวลา</label>
+              <p class="fw-bold text-dark">{{ resultData.audio_characteristics.duration_seconds }} วินาที</p>
+            </div>
+            <div class="characteristic-item mb-3">
+              <label class="text-muted small">อัตราการสุ่ม (Sample Rate)</label>
+              <p class="fw-bold text-dark">{{ resultData.audio_characteristics.sample_rate_khz }} kHz ({{ resultData.audio_characteristics.sample_rate_hz }} Hz)</p>
+            </div>
+            <div class="characteristic-item mb-3">
+              <label class="text-muted small">ความลึกของบิต (Bit Depth)</label>
+              <p class="fw-bold text-dark">{{ resultData.audio_characteristics.bit_depth }} bits</p>
+            </div>
+          </div>
+          
+          <div class="col-md-6">
+            <div class="characteristic-item mb-3">
+              <label class="text-muted small">จำนวนช่อง (Channels)</label>
+              <p class="fw-bold text-dark">{{ resultData.audio_characteristics.channels === 1 ? 'Mono' : 'Stereo' }} ({{ resultData.audio_characteristics.channels }})</p>
+            </div>
+            <div class="characteristic-item mb-3">
+              <label class="text-muted small">ขนาดไฟล์</label>
+              <p class="fw-bold text-dark">{{ resultData.audio_characteristics.file_size_mb }} MB ({{ resultData.audio_characteristics.file_size_bytes }} bytes)</p>
+            </div>
+            <div class="characteristic-item mb-3">
+              <label class="text-muted small">รูปแบบไฟล์</label>
+              <p class="fw-bold text-dark">{{ resultData.audio_characteristics.format | uppercase }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mel-Spectrogram Visualization -->
+    <div class="card shadow-sm border-0 rounded-4 p-4 mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-4"><i class="bi bi-soundwave"></i> Mel-Spectrogram สำหรับแต่ละ Segment</h5>
+        
+        <div class="segments-container">
+          <div *ngFor="let segment of resultData.segment_spectrograms" class="segment-card mb-4">
+            <div class="segment-header mb-2">
+              <span class="badge bg-primary">Segment {{ segment.segment_number }}</span>
+              <span class="badge bg-secondary ms-2">{{ segment.duration }}</span>
+            </div>
+            <div class="spectrogram-container">
+              <img [src]="segment.image" alt="Segment {{ segment.segment_number }} Mel-Spectrogram" class="spectrogram-image">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Predictions Table -->
+    <div class="card shadow-sm border-0 rounded-4 p-4 mb-4" *ngIf="resultData.is_valid_cricket">
+      <div class="card-body">
+        <h5 class="card-title mb-4"><i class="bi bi-table"></i> รายละเอียดผลการวิเคราะห์ทั้งหมด</h5>
+        
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 40%;">สายพันธุ์จิ้งหรีด</th>
+                <th style="width: 30%;">ความมั่นใจ</th>
+                <th style="width: 30%;">ความน่าจะเป็น</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let pred of resultData.all_predictions; let i = index;" 
+                  [class.table-success]="i === 0">
+                <td>
+                  <strong class="text-primary">{{ pred.species }}</strong>
+                  <span *ngIf="i === 0" class="badge bg-success ms-2">🏆 Top Match</span>
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="i === 0 ? 'bg-success' : 'bg-secondary'">
+                    {{ pred.confidence_percent }}
+                  </span>
+                </td>
+                <td>
+                  <div class="progress" style="height: 20px;">
+                    <div 
+                      class="progress-bar" 
+                      [ngClass]="i === 0 ? 'bg-success' : 'bg-info'"
+                      [style.width.%]="pred.confidence"
+                      role="progressbar">
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analysis Info Card -->
+    <div class="card shadow-sm border-0 rounded-4 p-4 border-start border-4 border-primary">
+      <div class="card-body">
+        <h6 class="card-title text-secondary mb-2"><i class="bi bi-info-circle-fill"></i> ข้อมูลการวิเคราะห์</h6>
+        <p class="text-muted mb-2">
+          <small>{{ resultData.message }}</small>
+        </p>
+        <p class="text-muted mb-0">
+          <small><strong>ชื่อไฟล์:</strong> {{ resultData.original_file }}</small>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .bg-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .bg-gradient .text-primary {
+    color: #ffd700 !important;
+  }
+  
+  .bg-gradient .text-muted {
+    color: rgba(255, 255, 255, 0.85) !important;
+  }
+  
+  .bg-danger-light {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+  }
+  
+  .bg-danger-light .text-danger {
+    color: #fff !important;
+  }
+  
+  .bg-danger-light .text-muted {
+    color: rgba(255, 255, 255, 0.85) !important;
+  }
+  
+  .confidence-display {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 10px;
+  }
+  
+  .confidence-display-invalid {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+  }
+  
+  .alert-warning {
+    background-color: #fff3cd;
+    border-color: #ff6b6b;
+  }
+  
+  .alert-warning .alert-heading {
+    color: #ff6b6b;
+  }
+  
+  .alert-warning p {
+    color: #666;
+  }
+  
+  .stats-card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease;
+  }
+  
+  .stats-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .table-hover tbody tr:hover {
+    background-color: rgba(16, 185, 129, 0.05) !important;
+  }
+  
+  .spectrogram-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+  }
+  
+  .spectrogram-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .characteristic-item {
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #0d6efd;
+  }
+  
+  .characteristic-item p {
+    margin: 6px 0 0 0;
+    font-size: 1.1rem;
+  }
+  
+  .segment-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    background-color: #fafafa;
+    transition: all 0.3s ease;
+  }
+  
+  .segment-card:hover {
+    border-color: #667eea;
+    background-color: #f5f3ff;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  }
+  
+  .segment-header {
+    display: flex;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .segments-container {
+    max-height: 800px;
+    overflow-y: auto;
+    padding-right: 10px;
+  }
+  
+  .segments-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .segments-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  .segments-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+  }
+  
+  .segments-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  
+  .breed-icon {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    margin-right: auto;
+    color: white;
+  }
+  
+  .detail-item {
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+    margin-bottom: 12px;
+  }
+  
+  .detail-label {
+    display: block;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+  }
+  
+  .detail-value {
+    color: #333;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  
+  .text-justify {
+    text-align: justify;
+    line-height: 1.6;
+    color: #555;
+  }
+
+  /* Tab Styling */
+  .tabs-container .btn-group {
+    display: flex;
+    gap: 0;
+  }
+
+  .tabs-container .btn {
+    border-radius: 8px;
+    flex: 1;
+    margin: 0 5px;
+    transition: all 0.3s ease;
+  }
+
+  .tabs-container .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+  }
+
+  .tabs-container .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0b5ed7;
+  }
+
+  .tabs-container .btn-outline-primary {
+    color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  .tabs-container .btn-outline-primary:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+  }
+
+  #record-section {
+    animation: slideIn 0.3s ease-in-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .record-timer {
+    animation: pulse 1s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  .record-controls button {
+    min-height: 50px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .record-controls button:active {
+    transform: scale(0.98);
+  }
+
+  .recorded-controls .btn {
+    min-height: 45px;
+    font-size: 0.95rem;
+  }
+</style>

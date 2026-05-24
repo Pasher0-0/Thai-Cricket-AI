@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+tensorflow
+pydub
+matplotlib
+python-multipart
+huggingface_hub
+librosa
+soundfile
+tensorflow-model-optimization

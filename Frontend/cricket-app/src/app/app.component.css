@@ -1,0 +1,62 @@
+/* Dark, minimal navbar styling for AI theme */
+.navbar {
+	background: linear-gradient(90deg, #050814 0%, #0a1220 100%) !important;
+	border-bottom: 1px solid rgba(79, 172, 254, 0.1);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.navbar-brand {
+	color: #4faafe !important;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	transition: color 0.3s ease;
+}
+.navbar-brand:hover {
+	color: #a8d5ff !important;
+}
+.nav-link {
+	color: #a8d5ff !important;
+	margin-right: 1rem;
+	position: relative;
+	transition: color 0.3s ease;
+	font-weight: 500;
+}
+.nav-link:hover {
+	color: #4faafe !important;
+}
+.nav-link.active {
+	color: #4faafe !important;
+	font-weight: 700;
+}
+.nav-link.active::after {
+	content: '';
+	position: absolute;
+	bottom: -8px;
+	left: 0;
+	right: 0;
+	height: 2px;
+	background: linear-gradient(90deg, #4faafe 0%, transparent 100%);
+}
+
+body {
+	background: linear-gradient(135deg, #050814 0%, #0a1220 50%, #050814 100%);
+	color: #dbe9ff;
+	min-height: 100vh;
+}
+
+/* Footer */
+.app-footer {
+	background: linear-gradient(90deg, #050814 0%, #0a1220 100%);
+	color: #9fbff6;
+	padding: 0.75rem 0;
+	border-top: 1px solid rgba(79, 172, 254, 0.06);
+	font-size: 0.9rem;
+}
+.app-footer a {
+	color: #bfe0ff;
+	text-decoration: underline;
+}
+.app-footer a:hover {
+	color: #ffffff;
+}
+
+

@@ -1,0 +1,14 @@
+# Node
+Frontend/cricket-app/node_modules/
+Frontend/cricket-app/dist/
+Frontend/cricket-app/.angular/
+# Python
+Backend/cricket-api/cricket-api/__pycache__/
+Backend/cricket-api/cricket-api/*.pyc
+Backend/cricket-api/env/
+# Temporary / OS
+*.pyc
+*.pyo
+*.swp
+.DS_Store
+.env
